@@ -100,6 +100,7 @@ public slots:
     void deposit() {
         QString name = nameInput->text();
         double amount = amountInput->text().toDouble();
+        if (amountInput->text() != "0" ){
         QSqlQuery query;
         query.prepare("UPDATE accounts SET balance = balance + :amount WHERE name = :name");
         query.bindValue(":amount", amount);
@@ -109,11 +110,13 @@ public slots:
         logTransaction(name, "Deposit", amount);
         loadClients();
         output->append("Deposited " + QString::number(amount) + " to " + name);
+        }
     }
 
     void takeLoan() {
         QString name = nameInput->text();
         double amount = amountInput->text().toDouble();
+        if (amountInput->text() != "0" ){
         QSqlQuery query;
         query.prepare("UPDATE accounts SET loan = loan + :amount, balance = balance + :amount WHERE name = :name");
         query.bindValue(":amount", amount);
@@ -123,6 +126,7 @@ public slots:
         logTransaction(name, "Loan", amount);
         loadClients();
         output->append(name + " took a loan of " + QString::number(amount));
+        }
     }
 
     void displayHistory() {
@@ -187,6 +191,7 @@ public slots:
     void selectClient(int row, int) {
         nameInput->setText(clientTable->item(row, 0)->text());
         addressInput->setText(clientTable->item(row, 1)->text());
+        amountInput->setText("0");
     }
 
 private:
