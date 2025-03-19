@@ -14,19 +14,24 @@
 #include <QDate>
 #include <QMessageBox>
 #include <qtimer.h>
-
+#include <QSplitter>
 
 bool bmidnight;
 bool intrestbuttont;
+bool btoggle;
 
 class Bank : public QWidget {
     Q_OBJECT
 public:
     Bank(QWidget *parent = nullptr) : QWidget(parent) {
         setWindowTitle("Banking App");
-        setFixedSize(900, 700);
+        setFixedSize(700, 500);
 
         QVBoxLayout *layout = new QVBoxLayout(this);
+
+        QSplitter *splitter = new QSplitter(parent);
+        QSplitter *splitter2 = new QSplitter(parent);
+        QSplitter *splitter3 = new QSplitter(parent);
 
         searchInput = new QLineEdit(this);
         searchInput->setPlaceholderText("Search Client");
@@ -39,6 +44,7 @@ public:
         clientTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
         connect(clientTable, &QTableWidget::cellClicked, this, &Bank::selectClient);
         layout->addWidget(clientTable);
+        clientTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
 
         nameInput = new QLineEdit(this);
         nameInput->setPlaceholderText("Enter Name");
@@ -52,34 +58,48 @@ public:
         amountInput->setPlaceholderText("Enter Amount");
         layout->addWidget(amountInput);
 
-        QPushButton *createButton = new QPushButton("Create Account", this);
-        connect(createButton, &QPushButton::clicked, this, &Bank::createAccount);
-        layout->addWidget(createButton);
-
         QPushButton *depositButton = new QPushButton("Deposit", this);
         connect(depositButton, &QPushButton::clicked, this, &Bank::deposit);
-        layout->addWidget(depositButton);
+                splitter->addWidget(depositButton);
+
 
         QPushButton *loanButton = new QPushButton("Take Loan", this);
         connect(loanButton, &QPushButton::clicked, this, &Bank::takeLoan);
-        layout->addWidget(loanButton);
+        splitter->addWidget(loanButton);
 
-        QPushButton *historyButton = new QPushButton("Show Transaction History", this);
+
+        QPushButton *historyButton = new QPushButton("Show History", this);
         connect(historyButton, &QPushButton::clicked, this, &Bank::displayHistory);
-        layout->addWidget(historyButton);
+        splitter->addWidget(historyButton);
+        layout->addWidget(splitter);
+
+
+        QLabel *intrestlabel = new QLabel(this);
+        intrestlabel->setText("Yearly Intrest Rate %");
+        splitter3->addWidget(intrestlabel);
 
         amountIntrest = new QLineEdit(this);
         amountIntrest->setPlaceholderText("yearly intrest 5%");
         amountIntrest->setText("5");
-        layout->addWidget(amountIntrest);
+        splitter3->addWidget(amountIntrest);
 
         QPushButton *interestButton = new QPushButton("ApplyDailyInterest", this);
         connect(interestButton, &QPushButton::clicked, this, &Bank::applyDailyInterestButton);
-        layout->addWidget(interestButton);
+        splitter3->addWidget(interestButton);
+       layout->addWidget(splitter3);
+
+       QPushButton *createButton = new QPushButton("Create Account", this);
+       connect(createButton, &QPushButton::clicked, this, &Bank::createAccount);
+       splitter2->addWidget(createButton);
+
+        QPushButton *editButton = new QPushButton("Edit Address", this);
+        connect(editButton, &QPushButton::clicked, this, &Bank::StoreChanges);
+        splitter2->addWidget(editButton);
 
         QPushButton *deleteButton = new QPushButton("Delete Account", this);
         connect(deleteButton, &QPushButton::clicked, this, &Bank::deleteAccount);
-        layout->addWidget(deleteButton);
+        splitter2->addWidget(deleteButton);
+        layout->addWidget(splitter2);
 
         QTimer *timer = new QTimer(this);
         connect(timer, &QTimer::timeout, this, QOverload<>::of(&Bank::CheckTime));
@@ -89,7 +109,7 @@ public:
         reply = QMessageBox::question(this, "Question", "would you like the program to apply daily intrest updates for you ?",
                                       QMessageBox::Yes|QMessageBox::No);
         if (reply == QMessageBox::Yes) {
-            timer->start(10000);
+            timer->start(30000);
             intrestbuttont=false;
         }
 
@@ -114,7 +134,36 @@ public:
     }
 
 public slots:
-    void createAccount() {
+    void editToggle() {
+        if ( !btoggle ) {
+         clientTable->setEditTriggers(QAbstractItemView::AllEditTriggers);
+         btoggle=true;
+        }else{
+         clientTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+         btoggle=false;
+        }
+    }
+    void StoreChanges() {
+        QMessageBox::StandardButton reply;
+        reply = QMessageBox::question(this, "are you sure", "update address ?",
+                                      QMessageBox::Yes|QMessageBox::No);
+        if (reply == QMessageBox::Yes) {
+        QSqlQuery query;
+        query.prepare("UPDATE accounts SET address = :address WHERE name = :name");
+        query.bindValue(":address", addressInput->text());
+        query.bindValue(":name", nameInput->text());
+       //clientTable->currentRow()
+        query.exec();
+       // logTransaction(name, "Deposit", amount);
+        loadClients();
+        }
+    }
+
+
+
+    void createAccount() {     
+
+        //look for doubles before making second
         QString name = nameInput->text();
         QString address = addressInput->text();
         double initialDeposit = amountInput->text().toDouble();
@@ -141,11 +190,12 @@ public slots:
          QTime currentTime = QTime::currentTime();
        if( currentTime.hour() == 24 && currentTime.minute() < 2){
            intrestbuttont=false;
+           bmidnight=1;
            applyDailyInterest();
        }else{
            bmidnight=0;
        }
-      //  qDebug() << currentTime.hour();
+        qDebug() << currentTime.hour();
      }
 
     void deleteAccount() {
