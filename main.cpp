@@ -20,7 +20,7 @@ class Bank : public QWidget {
 public:
     Bank(QWidget *parent = nullptr) : QWidget(parent) {
         setWindowTitle("Banking App");
-        setFixedSize(600, 500);
+        setFixedSize(900, 700);
 
         QVBoxLayout *layout = new QVBoxLayout(this);
 
@@ -72,6 +72,10 @@ public:
         connect(interestButton, &QPushButton::clicked, this, &Bank::applyDailyInterest);
         layout->addWidget(interestButton);
 
+        QPushButton *deleteButton = new QPushButton("Delete Account", this);
+        connect(deleteButton, &QPushButton::clicked, this, &Bank::deleteAccount);
+        layout->addWidget(deleteButton);
+
         output = new QTextEdit(this);
         output->setReadOnly(true);
         layout->addWidget(output);
@@ -112,6 +116,25 @@ public slots:
         }
         loadClients();
         output->append("Account created for " + name);
+    }
+
+    void deleteAccount() {
+        QMessageBox::StandardButton reply;
+        reply = QMessageBox::question(this, "are you sure", "Apply Intrest ?",
+                                      QMessageBox::Yes|QMessageBox::No);
+        if (reply == QMessageBox::Yes) {
+
+
+        QString name = nameInput->text();
+        QSqlQuery query;
+        query.prepare("DELETE FROM accounts WHERE name = :name");
+        query.bindValue(":name", name);
+        query.exec();
+
+        logTransaction("System", name+" Removed", 0);
+           loadClients();
+        }
+
     }
 
     void deposit() {
@@ -199,8 +222,6 @@ public slots:
     }
 
     void applyDailyInterest() {
-        //check yes box
-
         QMessageBox::StandardButton reply;
         reply = QMessageBox::question(this, "are you sure", "Apply Intrest ?",
                                       QMessageBox::Yes|QMessageBox::No);
