@@ -184,6 +184,31 @@ public slots:
         }
         output->append("Yearly interest applied.");
     }
+
+    void applyDailyInterest() {
+        double annualInterestRate = 5.0; // 5% yearly interest
+        double dailyInterestRate = annualInterestRate / 365.0 / 100.0;
+
+        QSqlQuery query("SELECT id, balance, loan FROM accounts");
+        while (query.next()) {
+            int id = query.value(0).toInt();
+            double balance = query.value(1).toDouble();
+            double loan = query.value(2).toDouble();
+
+            double balanceInterest = balance * dailyInterestRate * 30; // Assuming 30 days in a month
+            double loanInterest = loan * dailyInterestRate * 30;
+
+            QSqlQuery updateQuery;
+            updateQuery.prepare("UPDATE accounts SET balance = balance + :balanceInterest, loan = loan + :loanInterest WHERE id = :id");
+            updateQuery.bindValue(":balanceInterest", balanceInterest);
+            updateQuery.bindValue(":loanInterest", loanInterest);
+            updateQuery.bindValue(":id", id);
+            updateQuery.exec();
+
+            logTransaction("System", "Interest Applied", balanceInterest - loanInterest);
+        }
+    }
+
     void searchClients() {
         QString searchText = searchInput->text();
         for (int i = 0; i < clientTable->rowCount(); i++) {
