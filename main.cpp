@@ -213,11 +213,12 @@ public slots:
             }
 
             int daysElapsed = lastDate.daysTo(currentDate);
+            qDebug() << daysElapsed << endl;
             if (daysElapsed <= 0) continue;
 
             double balanceInterest = balance * dailyInterestRate * daysElapsed;
             double loanInterest = loan * dailyInterestRate * daysElapsed;
-
+ qDebug() << loanInterest << endl;
             QSqlQuery updateQuery;
             updateQuery.prepare("UPDATE accounts SET balance = balance + :balanceInterest, loan = loan + :loanInterest, last_interest_date = :newDate WHERE id = :id");
             updateQuery.bindValue(":balanceInterest", balanceInterest);
@@ -226,6 +227,7 @@ public slots:
             updateQuery.bindValue(":id", id);
             updateQuery.exec();
 
+            logTransaction(clientTable->item(id-1, 0)->text(), "Interest", balanceInterest - loanInterest);
             logTransaction("System", "Interest Applied", balanceInterest - loanInterest);
         }
     }
