@@ -65,7 +65,8 @@ public:
         layout->addWidget(historyButton);
 
         amountIntrest = new QLineEdit(this);
-        amountIntrest->setPlaceholderText("5");
+        amountIntrest->setPlaceholderText("yearly intrest 5%");
+        amountIntrest->setText("5");
         layout->addWidget(amountIntrest);
 
         QPushButton *interestButton = new QPushButton("ApplyDailyInterest", this);
@@ -253,7 +254,8 @@ public slots:
 
             double balanceInterest = balance * dailyInterestRate * daysElapsed;
             double loanInterest = loan * dailyInterestRate * daysElapsed;
- qDebug() << loanInterest << endl;
+ qDebug() << "balance intrest" << balanceInterest << endl;
+  qDebug() << loanInterest << endl;
             QSqlQuery updateQuery;
             updateQuery.prepare("UPDATE accounts SET balance = balance + :balanceInterest, loan = loan + :loanInterest, last_interest_date = :newDate WHERE id = :id");
             updateQuery.bindValue(":balanceInterest", balanceInterest);
@@ -263,8 +265,11 @@ public slots:
             updateQuery.exec();
 
             logTransaction(clientTable->item(id-1, 0)->text(), "Interest", balanceInterest - loanInterest);
+            logTransaction(clientTable->item(id-1, 0)->text(), "Loan Interest Charged", -loanInterest);
             logTransaction("System", "Interest Applied", balanceInterest - loanInterest);
+            logTransaction("System", "Loan Interest Charged", -loanInterest);
         }
+                loadClients();
         } else {
         //  qDebug() << "Yes was *not* clicked";
         }
