@@ -81,7 +81,7 @@ public:
             return;
         }
         QSqlQuery query;
-        query.exec("CREATE TABLE IF NOT EXISTS accounts (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, address TEXT, balance REAL, loan REAL)");
+        query.exec("CREATE TABLE IF NOT EXISTS accounts (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, address TEXT, balance REAL, loan REAL, last_interest_date TEXT)");
         query.exec("CREATE TABLE IF NOT EXISTS transactions (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, type TEXT, amount REAL, date TEXT)");
         loadClients();
     }
@@ -91,12 +91,14 @@ public slots:
         QString name = nameInput->text();
         QString address = addressInput->text();
         double initialDeposit = amountInput->text().toDouble();
+                    QDate currentDate = QDate::currentDate();
         QSqlQuery query;
-        query.prepare("INSERT INTO accounts (name, address, balance, loan) VALUES (:name, :address, :balance, :loan)");
+        query.prepare("INSERT INTO accounts (name, address, balance, loan, last_interest_date) VALUES (:name, :address, :balance, :loan, :intrestdate)");
         query.bindValue(":name", name);
         query.bindValue(":address", address);
         query.bindValue(":balance", initialDeposit);
         query.bindValue(":loan", 0.0);
+        query.bindValue(":intrestdate", currentDate.toString("yyyy-MM-dd"));
         query.exec();
 
         if (initialDeposit > 0) {
