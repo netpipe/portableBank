@@ -120,7 +120,7 @@ public slots:
 
     void deleteAccount() {
         QMessageBox::StandardButton reply;
-        reply = QMessageBox::question(this, "are you sure", "Apply Intrest ?",
+        reply = QMessageBox::question(this, "are you sure", "Delete Account ?",
                                       QMessageBox::Yes|QMessageBox::No);
         if (reply == QMessageBox::Yes) {
 
