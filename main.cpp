@@ -12,6 +12,8 @@
 #include <QtSql/QSqlError>
 #include <QDebug>
 #include <QDate>
+#include <QMessageBox>
+
 
 class Bank : public QWidget {
     Q_OBJECT
@@ -61,6 +63,10 @@ public:
         QPushButton *historyButton = new QPushButton("Show Transaction History", this);
         connect(historyButton, &QPushButton::clicked, this, &Bank::displayHistory);
         layout->addWidget(historyButton);
+
+        amountIntrest = new QLineEdit(this);
+        amountIntrest->setPlaceholderText("5");
+        layout->addWidget(amountIntrest);
 
         QPushButton *interestButton = new QPushButton("ApplyDailyInterest", this);
         connect(interestButton, &QPushButton::clicked, this, &Bank::applyDailyInterest);
@@ -193,7 +199,15 @@ public slots:
     }
 
     void applyDailyInterest() {
-        double annualInterestRate = 5.0; // 5% yearly interest
+        //check yes box
+
+        QMessageBox::StandardButton reply;
+        reply = QMessageBox::question(this, "are you sure", "Apply Intrest ?",
+                                      QMessageBox::Yes|QMessageBox::No);
+        if (reply == QMessageBox::Yes) {
+
+
+        double annualInterestRate = amountIntrest->text().toInt(); // 5% yearly interest
         double dailyInterestRate = annualInterestRate / 365.0 / 100.0;
 
         QSqlQuery query("SELECT id, balance, loan, last_interest_date FROM accounts");
@@ -230,6 +244,9 @@ public slots:
             logTransaction(clientTable->item(id-1, 0)->text(), "Interest", balanceInterest - loanInterest);
             logTransaction("System", "Interest Applied", balanceInterest - loanInterest);
         }
+        } else {
+        //  qDebug() << "Yes was *not* clicked";
+        }
     }
 
 
@@ -253,6 +270,7 @@ private:
     QLineEdit *addressInput;
     QLineEdit *amountInput;
     QLineEdit *searchInput;
+    QLineEdit *amountIntrest;
     QTextEdit *output;
     QTableWidget *clientTable;
 };
