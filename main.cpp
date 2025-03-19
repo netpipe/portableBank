@@ -16,6 +16,9 @@
 #include <qtimer.h>
 
 
+bool bmidnight;
+bool intrestbuttont;
+
 class Bank : public QWidget {
     Q_OBJECT
 public:
@@ -71,7 +74,7 @@ public:
         layout->addWidget(amountIntrest);
 
         QPushButton *interestButton = new QPushButton("ApplyDailyInterest", this);
-        connect(interestButton, &QPushButton::clicked, this, &Bank::applyDailyInterest);
+        connect(interestButton, &QPushButton::clicked, this, &Bank::applyDailyInterestButton);
         layout->addWidget(interestButton);
 
         QPushButton *deleteButton = new QPushButton("Delete Account", this);
@@ -87,6 +90,7 @@ public:
                                       QMessageBox::Yes|QMessageBox::No);
         if (reply == QMessageBox::Yes) {
             timer->start(10000);
+            intrestbuttont=false;
         }
 
         output = new QTextEdit(this);
@@ -135,8 +139,11 @@ public slots:
          QTimer *timer;
 
          QTime currentTime = QTime::currentTime();
-       if( currentTime.hour() == 24){
+       if( currentTime.hour() == 24 && currentTime.minute() < 2){
+           intrestbuttont=false;
            applyDailyInterest();
+       }else{
+           bmidnight=0;
        }
       //  qDebug() << currentTime.hour();
      }
@@ -244,10 +251,25 @@ public slots:
         output->append("Yearly interest applied.");
     }
 
+   void applyDailyInterestButton() {
+  intrestbuttont=true;
+        applyDailyInterest();
+    }
+
     void applyDailyInterest() {
+        QTime currentDate = QTime::currentTime();
+
+
         QMessageBox::StandardButton reply;
+        if (intrestbuttont ) {
         reply = QMessageBox::question(this, "are you sure", "Apply Intrest ?",
                                       QMessageBox::Yes|QMessageBox::No);
+        }else {intrestbuttont=false;
+            reply = QMessageBox::Yes;
+        qDebug() << "button intrest" ;
+        }
+
+
         if (reply == QMessageBox::Yes) {
 
 
