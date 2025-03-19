@@ -11,6 +11,7 @@
 #include <QtSql/QSqlQuery>
 #include <QtSql/QSqlError>
 #include <QDebug>
+#include <QDate>
 
 class Bank : public QWidget {
     Q_OBJECT
@@ -60,6 +61,10 @@ public:
         QPushButton *historyButton = new QPushButton("Show Transaction History", this);
         connect(historyButton, &QPushButton::clicked, this, &Bank::displayHistory);
         layout->addWidget(historyButton);
+
+        QPushButton *interestButton = new QPushButton("ApplyDailyInterest", this);
+        connect(interestButton, &QPushButton::clicked, this, &Bank::applyDailyInterest);
+        layout->addWidget(interestButton);
 
         output = new QTextEdit(this);
         output->setReadOnly(true);
@@ -189,25 +194,40 @@ public slots:
         double annualInterestRate = 5.0; // 5% yearly interest
         double dailyInterestRate = annualInterestRate / 365.0 / 100.0;
 
-        QSqlQuery query("SELECT id, balance, loan FROM accounts");
+        QSqlQuery query("SELECT id, balance, loan, last_interest_date FROM accounts");
         while (query.next()) {
             int id = query.value(0).toInt();
             double balance = query.value(1).toDouble();
             double loan = query.value(2).toDouble();
+            QString lastInterestDate = query.value(3).toString();
 
-            double balanceInterest = balance * dailyInterestRate * 30; // Assuming 30 days in a month
-            double loanInterest = loan * dailyInterestRate * 30;
+            // Get the current date
+            QDate currentDate = QDate::currentDate();
+            QDate lastDate = QDate::fromString(lastInterestDate, "yyyy-MM-dd");
+
+            // If last interest date is not set, assume account was created today
+            if (!lastDate.isValid()) {
+                lastDate = currentDate;
+            }
+
+            int daysElapsed = lastDate.daysTo(currentDate);
+            if (daysElapsed <= 0) continue;
+
+            double balanceInterest = balance * dailyInterestRate * daysElapsed;
+            double loanInterest = loan * dailyInterestRate * daysElapsed;
 
             QSqlQuery updateQuery;
-            updateQuery.prepare("UPDATE accounts SET balance = balance + :balanceInterest, loan = loan + :loanInterest WHERE id = :id");
+            updateQuery.prepare("UPDATE accounts SET balance = balance + :balanceInterest, loan = loan + :loanInterest, last_interest_date = :newDate WHERE id = :id");
             updateQuery.bindValue(":balanceInterest", balanceInterest);
             updateQuery.bindValue(":loanInterest", loanInterest);
+            updateQuery.bindValue(":newDate", currentDate.toString("yyyy-MM-dd"));
             updateQuery.bindValue(":id", id);
             updateQuery.exec();
 
             logTransaction("System", "Interest Applied", balanceInterest - loanInterest);
         }
     }
+
 
     void searchClients() {
         QString searchText = searchInput->text();
