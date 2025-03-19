@@ -13,6 +13,7 @@
 #include <QDebug>
 #include <QDate>
 #include <QMessageBox>
+#include <qtimer.h>
 
 
 class Bank : public QWidget {
@@ -77,6 +78,17 @@ public:
         connect(deleteButton, &QPushButton::clicked, this, &Bank::deleteAccount);
         layout->addWidget(deleteButton);
 
+        QTimer *timer = new QTimer(this);
+        connect(timer, &QTimer::timeout, this, QOverload<>::of(&Bank::CheckTime));
+        //timer->start(10000);
+
+        QMessageBox::StandardButton reply;
+        reply = QMessageBox::question(this, "Question", "would you like the program to apply daily intrest updates for you ?",
+                                      QMessageBox::Yes|QMessageBox::No);
+        if (reply == QMessageBox::Yes) {
+            timer->start(10000);
+        }
+
         output = new QTextEdit(this);
         output->setReadOnly(true);
         layout->addWidget(output);
@@ -118,6 +130,16 @@ public slots:
         loadClients();
         output->append("Account created for " + name);
     }
+
+     void CheckTime() {
+         QTimer *timer;
+
+         QTime currentTime = QTime::currentTime();
+       if( currentTime.hour() == 24){
+           applyDailyInterest();
+       }
+      //  qDebug() << currentTime.hour();
+     }
 
     void deleteAccount() {
         QMessageBox::StandardButton reply;
@@ -274,7 +296,6 @@ public slots:
         //  qDebug() << "Yes was *not* clicked";
         }
     }
-
 
     void searchClients() {
         QString searchText = searchInput->text();
