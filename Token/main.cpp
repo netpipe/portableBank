@@ -98,12 +98,12 @@ QString validateTokenRedemption(const QString &token) {
         return "Invalid Token: Not part of active set.";
     }
 
-    if (valid.value(0).toBool()) {
+    if (valid.value(0).toBool() == 0) {
         return "Token already redeemed.";
     }
 
     QSqlQuery update;
-    update.prepare("UPDATE valid_tokens SET redeemed = 1 WHERE token = :token");
+    update.prepare("UPDATE valid_tokens SET redeemed = 0 WHERE token = :token");
     update.bindValue(":token", token);
     update.exec();
     return "Token successfully redeemed.";
@@ -298,7 +298,7 @@ QString importTokenFile() {
         QSqlQuery q;
         q.prepare("UPDATE valid_tokens SET redeemed = 1 WHERE token = :token AND redeemed = 0");
         q.bindValue(":token", token);
-        q.exec();
+     //   q.exec();
         if (q.numRowsAffected() > 0) redeemed++;
     }
 
@@ -317,8 +317,7 @@ QString importTokenFile() {
         QString backupPath = queryBackup.value(0).toString();
         QString storedMD5 = queryBackup.value(1).toString();
         QDateTime expiry = QDateTime::fromString(queryBackup.value(2).toString(), Qt::ISODate);
- //qDebug() << expiry;
- //qDebug() << QDateTime::currentDateTime();
+
         if (expiry > QDateTime::currentDateTime()) {
             QFile backupFile(backupPath);
 
@@ -377,12 +376,21 @@ QString importTokenFile() {
                   //  qDebug() << backupTokens[1].toLatin1();
  //qDebug() << backupTokens.count() ;
                     // Restore tokens from the backup file
+
+                        //check all before processing
+
+
                     for (const QString &token : backupTokens) {
+
+                         qDebug() << validateTokenRedemption(token);
+                      if ( validateTokenRedemption(token) == "Token successfully redeemed." ){
                         QSqlQuery restoreQuery;
                         restoreQuery.prepare("UPDATE valid_tokens SET redeemed = 0 WHERE token = :token");
-                        restoreQuery.bindValue(":token", token);
-                        restoreQuery.exec();
+                       restoreQuery.bindValue(":token", token);
+                     //   restoreQuery.exec();
                      //   qDebug() << token ;
+                          qDebug() << "redeem";
+                          }
                     }
 
                     backupFile.close();
