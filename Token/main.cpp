@@ -17,6 +17,7 @@
 #include <QTextStream>
 #include <QDebug>
 #include <QSplitter>
+#include <QMessageBox>
 
 QLabel *tokensleftlbl;
 QLineEdit *tokenstxt;
@@ -39,7 +40,7 @@ int getTokensLeft() {
 
 void tokensleft()
 {
-    qDebug() << "test";
+   // qDebug() << "test";
     tokensleftlbl->setText(QString::number(getTokensLeft()) );
 }
 
@@ -73,6 +74,10 @@ void bruteForceTokenPool2(int total = 100000) {
 }
 
 void selectValidTokens(int count) {
+    QMessageBox::StandardButton reply;
+    reply = QMessageBox::question(0, "Question", "select new token pool ?",
+                                  QMessageBox::Yes|QMessageBox::No);
+    if (reply == QMessageBox::Yes) {
     QSqlQuery q;
     q.exec("DELETE FROM valid_tokens");
     QSqlQuery insert;
@@ -81,6 +86,7 @@ void selectValidTokens(int count) {
     insert.exec();
 
     tokensleft();
+    }
 }
 
 QString validateTokenRedemption(const QString &token) {
@@ -415,7 +421,7 @@ QString importTokenFile() {
             }
         }
     }
-
+        // if they match do cashout otherwise message invalid
     return QString("Imported %1 tokens. %2 were valid and redeemed.").arg(importedTokens.size()).arg(redeemed);
 }
 
@@ -500,7 +506,7 @@ int main(int argc, char *argv[]) {
 
       QTimer mytimer2;
    QObject::connect(&mytimer2,&QTimer::timeout,restoreExpiredTokensFromBackup);
-   mytimer.start(500000);
+   mytimer2.start(500000);
 
     QObject::connect(redeemBtn, &QPushButton::clicked, [&]() {
         QString result = validateTokenRedemption(tokenInput->text().trimmed());
