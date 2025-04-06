@@ -39,6 +39,7 @@ int getTokensLeft() {
 
 void tokensleft()
 {
+    qDebug() << "test";
     tokensleftlbl->setText(QString::number(getTokensLeft()) );
 }
 
@@ -449,11 +450,14 @@ int main(int argc, char *argv[]) {
     layout->addWidget(importBtn);
     layout->addWidget(output);
 
-   QTimer::singleShot(50, &tokensleft);
+  // QTimer::(10000, &tokensleft);
+    tokensleft();
 
-
-   // QTimer::singleShot(1000, this, SLOT( standaloneFunc(tokenslbl)));
-        tokensleftlbl->setText( QString::number(getTokensLeft()) );
+  //  QTimer::singleShot(1000, this, SLOT( standaloneFunc(tokenslbl)));
+     //   tokensleftlbl->setText( QString::number(getTokensLeft()) );
+   QTimer mytimer;
+   QObject::connect(&mytimer,&QTimer::timeout,tokensleft);
+   mytimer.start(5000);
 
 
     QObject::connect(redeemBtn, &QPushButton::clicked, [&]() {
