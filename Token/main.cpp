@@ -317,8 +317,9 @@ QString importTokenFile() {
         QString backupPath = queryBackup.value(0).toString();
         QString storedMD5 = queryBackup.value(1).toString();
         QDateTime expiry = QDateTime::fromString(queryBackup.value(2).toString(), Qt::ISODate);
- //qDebug() << "backup exists";
-       // if (expiry < QDateTime::currentDateTime()) {
+ //qDebug() << expiry;
+ //qDebug() << QDateTime::currentDateTime();
+        if (expiry > QDateTime::currentDateTime()) {
             QFile backupFile(backupPath);
 
             if (backupFile.exists() && backupFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
@@ -388,7 +389,7 @@ QString importTokenFile() {
                 } else {
                   //  qDebug() << "MD5 checksum mismatch for backup file: " << backupPath;
                 }
-         //   }
+            }
         }
     }
 
