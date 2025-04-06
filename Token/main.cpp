@@ -16,6 +16,8 @@
 #include <QFile>
 #include <QTextStream>
 #include <QDebug>
+#include <QSplitter>
+
 
 QString generateRandomToken(int length = 12) {
     const QString chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -81,7 +83,11 @@ QString validateTokenRedemption(const QString &token) {
     return "Token successfully redeemed.";
 }
 
-QString generateTokenFile(int count = 10, int hoursToExpire = 24) {
+QString generateTokenFile(QString count2, int hoursToExpire) {
+
+   int count = count2.toInt();
+
+    if (count != 0 && count2 != "") {
     QSqlQuery query;
     query.prepare("SELECT token FROM valid_tokens WHERE redeemed = 0 LIMIT :count");
     query.bindValue(":count", count);
@@ -130,6 +136,7 @@ QString generateTokenFile(int count = 10, int hoursToExpire = 24) {
 
             return QString("Exported %1 tokens to %2").arg(tokens.size()).arg(filePath);
         }
+    }
     }
     return "Export cancelled or failed.";
 }
@@ -326,6 +333,13 @@ int main(int argc, char *argv[]) {
     auto *redeemBtn = new QPushButton("Redeem Token");
     auto *genAllBtn = new QPushButton("Generate All Tokens");
     auto *genValidBtn = new QPushButton("Select Valid Tokens");
+
+    QLineEdit *test =  new QLineEdit;
+
+    QSplitter *splitter2 = new QSplitter;
+    QLabel *test2 = new QLabel;
+    test2->setText("tokens");
+
     auto *exportBtn = new QPushButton("Export Tokens to File");
     auto *importBtn = new QPushButton("Import & Redeem Token File");
 
@@ -333,6 +347,9 @@ int main(int argc, char *argv[]) {
     layout->addWidget(redeemBtn);
     layout->addWidget(genAllBtn);
     layout->addWidget(genValidBtn);
+    splitter2->addWidget(test2);
+    splitter2->addWidget(test);
+      layout->addWidget(splitter2);
     layout->addWidget(exportBtn);
     layout->addWidget(importBtn);
     layout->addWidget(output);
@@ -350,7 +367,7 @@ int main(int argc, char *argv[]) {
         output->appendPlainText("Selected valid tokens.");
     });
     QObject::connect(exportBtn, &QPushButton::clicked, [&]() {
-        output->appendPlainText(generateTokenFile());
+        output->appendPlainText(generateTokenFile(test->text(),24));
     });
     QObject::connect(importBtn, &QPushButton::clicked, [&]() {
         output->appendPlainText(importTokenFile());
