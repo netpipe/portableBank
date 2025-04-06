@@ -382,14 +382,15 @@ QString importTokenFile() {
 
                     for (const QString &token : backupTokens) {
 
-                         qDebug() << validateTokenRedemption(token);
+                    //     qDebug() << validateTokenRedemption(token);
                       if ( validateTokenRedemption(token) == "Token successfully redeemed." ){
                         QSqlQuery restoreQuery;
                         restoreQuery.prepare("UPDATE valid_tokens SET redeemed = 0 WHERE token = :token");
                        restoreQuery.bindValue(":token", token);
                      //   restoreQuery.exec();
                      //   qDebug() << token ;
-                          qDebug() << "redeem";
+                         // qDebug() << "redeem";
+                       redeemed = redeemed + 1;
                           }
                     }
 
