@@ -18,6 +18,7 @@
 #include <QDebug>
 #include <QSplitter>
 
+QLabel *tokensleftlbl;
 
 QString generateRandomToken(int length = 12) {
     const QString chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -48,7 +49,7 @@ void bruteForceTokenPool2(int total = 100000) {
     }
 }
 
-void selectValidTokens(int count = 1000) {
+void selectValidTokens(int count) {
     QSqlQuery q;
     q.exec("DELETE FROM valid_tokens");
     QSqlQuery insert;
@@ -307,6 +308,27 @@ QString importTokenFile() {
     return QString("Imported %1 tokens. %2 were valid and redeemed.").arg(importedTokens.size()).arg(redeemed);
 }
 
+int getTokensLeft() {
+    QSqlQuery query;
+    query.prepare("SELECT COUNT(*) FROM valid_tokens WHERE redeemed = 0");
+
+    if (!query.exec()) {
+        qDebug() << "Failed to execute query:" << query.lastError().text();
+        return -1; // Return -1 to indicate an error
+    }
+
+    if (query.next()) {
+        return query.value(0).toInt(); // Return the number of remaining tokens
+    }
+
+    return 0; // In case no tokens are left
+}
+
+void tokensleft()
+{
+    tokensleftlbl->setText(QString::number(getTokensLeft()) );
+}
+
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
     QWidget window;
@@ -334,40 +356,55 @@ int main(int argc, char *argv[]) {
     auto *genAllBtn = new QPushButton("Generate All Tokens");
     auto *genValidBtn = new QPushButton("Select Valid Tokens");
 
-    QLineEdit *test =  new QLineEdit;
+    QLineEdit *tokenstxt =  new QLineEdit;
+    QLineEdit *tokengen =  new QLineEdit;
+    //   QLineEdit *tokenstxt =  new QLineEdit;
 
+ QSplitter *splitter = new QSplitter;
     QSplitter *splitter2 = new QSplitter;
-    QLabel *test2 = new QLabel;
-    test2->setText("tokens");
+    QLabel *tokenslbl = new QLabel;
+    tokensleftlbl = new QLabel;
+    tokenslbl->setText("tokens");
+    tokengen->setText("10000");
 
     auto *exportBtn = new QPushButton("Export Tokens to File");
     auto *importBtn = new QPushButton("Import & Redeem Token File");
 
     layout->addWidget(tokenInput);
     layout->addWidget(redeemBtn);
-    layout->addWidget(genAllBtn);
-    layout->addWidget(genValidBtn);
-    splitter2->addWidget(test2);
-    splitter2->addWidget(test);
+    splitter->addWidget(tokengen);
+    splitter->addWidget(genAllBtn);
+    splitter->addWidget(genValidBtn);
+    layout->addWidget(splitter);
+    splitter2->addWidget(tokenslbl);
+    splitter2->addWidget(tokenstxt);
+        splitter2->addWidget(tokensleftlbl);
       layout->addWidget(splitter2);
     layout->addWidget(exportBtn);
     layout->addWidget(importBtn);
     layout->addWidget(output);
+
+   QTimer::singleShot(10000, &tokensleft);
+
+
+   // QTimer::singleShot(1000, this, SLOT( standaloneFunc(tokenslbl)));
+        tokensleftlbl->setText( QString::number(getTokensLeft()) );
+
 
     QObject::connect(redeemBtn, &QPushButton::clicked, [&]() {
         QString result = validateTokenRedemption(tokenInput->text().trimmed());
         output->appendPlainText(result);
     });
     QObject::connect(genAllBtn, &QPushButton::clicked, [&]() {
-        bruteForceTokenPool();
+        bruteForceTokenPool(tokengen->text().toInt()*1.5,1000);
         output->appendPlainText("Generated all tokens.");
     });
     QObject::connect(genValidBtn, &QPushButton::clicked, [&]() {
-        selectValidTokens();
+        selectValidTokens(tokengen->text().toInt());
         output->appendPlainText("Selected valid tokens.");
     });
     QObject::connect(exportBtn, &QPushButton::clicked, [&]() {
-        output->appendPlainText(generateTokenFile(test->text(),24));
+        output->appendPlainText(generateTokenFile(tokenstxt->text(),24));
     });
     QObject::connect(importBtn, &QPushButton::clicked, [&]() {
         output->appendPlainText(importTokenFile());
