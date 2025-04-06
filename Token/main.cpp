@@ -116,7 +116,7 @@ QString validateTokenRedemption(const QString &token) {
 }
 
 QString generateTokenFile(QString count2, int hoursToExpire) {
-
+   // QString text = QInputDialog::getText(0,"Title","text");
    int count = count2.toInt();
    int counted=0;
 
@@ -160,7 +160,11 @@ QString generateTokenFile(QString count2, int hoursToExpire) {
     lines << "MD5: " + QString(md5);
 
     // Create file name based on timestamp for backup and export
+    #ifdef __APPLE__
+    QString filePath = QFileDialog::getSaveFileName(nullptr, "Export Token File", "/Applications/EBANKER.app/Contents/MacOS/files", "Token File (*.iou)");
+     #else
     QString filePath = QFileDialog::getSaveFileName(nullptr, "Export Token File", "", "Token File (*.iou)");
+    #endif
     if (!filePath.isEmpty()) {
         QFile file(filePath);
         if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
@@ -201,7 +205,7 @@ void restoreExpiredTokensFromBackup() {
         qDebug() << "Failed to retrieve expired transaction files.";
         return;
     }
-
+//qDebug() << "test";
     while (query.next()) {
         QString backupPath = query.value(0).toString();
         QString storedMD5 = query.value(1).toString();
@@ -212,18 +216,33 @@ void restoreExpiredTokensFromBackup() {
             QFile backupFile(backupPath);
             if (backupFile.exists() && backupFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
                 QByteArray backupData = backupFile.readAll();
-                QByteArray calculatedMD5 = QCryptographicHash::hash(backupData, QCryptographicHash::Md5).toHex();
 
-                if (storedMD5 == QString(calculatedMD5)) {
+                QString backupText = QString::fromUtf8(backupData);
+                QStringList lines2 = backupText.split('\n');
+
+
+                int md5Index = lines2.lastIndexOf(QRegExp("^MD5: .*"));
+               if (md5Index == -1) qDebug() << "Invalid file format: No MD5 found.";
+
+                // Only join lines up to (but not including) the MD5 line
+                QString rawData = lines2.mid(0, md5Index).join("\n");
+
+
+                QByteArray calculatedMD52 = QCryptographicHash::hash(rawData.toUtf8(), QCryptographicHash::Md5).toHex();
+//qDebug() << storedMD5 << QString(calculatedMD52) ;
+               // if (storedMD5 == QString(calculatedMD52)) {
                     QTextStream in(&backupFile);
-                    QStringList lines;
-                    while (!in.atEnd()) {
-                        lines << in.readLine().trimmed();
+
+                    int tokensStart = -1;
+
+                    for (int i = 0; i < lines2.size(); ++i) {
+                        QString line = lines2[i].trimmed();
+                        if (line.startsWith("Tokens:")) {
+                            tokensStart = i + 1;
+                        }
                     }
 
-                    int tokenStart = lines.indexOf("Tokens:") + 1;
-                    int tokenEnd = lines.indexOf("MD5:") - 1;
-                    QStringList tokensToRestore = lines.mid(tokenStart, tokenEnd - tokenStart);
+                        QStringList tokensToRestore = lines2.mid(tokensStart, md5Index - tokensStart);
 
                     for (const QString &token : tokensToRestore) {
                         // Mark tokens as unredeemed
@@ -231,11 +250,13 @@ void restoreExpiredTokensFromBackup() {
                         q.prepare("UPDATE valid_tokens SET redeemed = 0 WHERE token = :token");
                         q.bindValue(":token", token);
                         q.exec();
+                     //   qDebug() << token;
                     }
+                    qDebug() << "restored tokens";
                     backupFile.close();
-                } else {
-                    qDebug() << "MD5 checksum mismatch for backup file: " << backupPath;
-                }
+               // } else {
+                //    qDebug() << "MD5 checksum mismatch for backup file: " << backupPath;
+                //}
             }
         }
     }
@@ -301,7 +322,7 @@ QString importTokenFile() {
     QString expiryLine = lines.filter(QRegExp("^Expires:")).value(0);
     QDateTime expiry = QDateTime::fromString(expiryLine.mid(8).trimmed(), Qt::ISODate);
     if (expiry.isValid() && expiry < QDateTime::currentDateTime()) {
-        return "Token file expired on " + expiry.toString();
+       // return "Token file expired on " + expiry.toString();
     }
 
     // Find and restore tokens from the file
@@ -323,7 +344,7 @@ QString importTokenFile() {
     QSqlQuery queryBackup;
   //  queryBackup.prepare("SELECT backup_path, md5_checksum, expiry_time FROM transaction_files WHERE expiry_time < :current_time");
 
-    // remove entry after processing - todo
+
         queryBackup.prepare("SELECT backup_path, md5_checksum, expiry_time FROM transaction_files");
     queryBackup.bindValue(":current_time", QDateTime::currentDateTime().toString(Qt::ISODate));
 
@@ -331,9 +352,9 @@ QString importTokenFile() {
         qDebug() << "Failed to retrieve expired transaction files.";
         return "Error retrieving expired transaction files.";
     }
-
+ QString backupPath;
     while (queryBackup.next()) {
-        QString backupPath = queryBackup.value(0).toString();
+        backupPath = queryBackup.value(0).toString();
         QString storedMD5 = queryBackup.value(1).toString();
         QDateTime expiry = QDateTime::fromString(queryBackup.value(2).toString(), Qt::ISODate);
 
@@ -421,6 +442,11 @@ QString importTokenFile() {
             }
         }
     }
+
+    if (importedTokens.size() != redeemed){
+    QMessageBox::information(0, "Alert", "tokenfile not valid dont pay ?",QMessageBox::Ok);
+    qDebug() << backupPath;
+    }
         // if they match do cashout otherwise message invalid
     return QString("Imported %1 tokens. %2 were valid and redeemed.").arg(importedTokens.size()).arg(redeemed);
 }
@@ -431,8 +457,13 @@ int main(int argc, char *argv[]) {
     window.setWindowTitle("Secure IOU Token System");
     auto *layout = new QVBoxLayout(&window);
 
+    //load config file with last used database
     QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE");
-    db.setDatabaseName("tokens.db");
+#ifdef __APPLE__
+    db.setDatabaseName("/Applications/EBANKER.app/Contents/MacOS/tokens.db");
+#else
+       db.setDatabaseName("tokens.db");
+#endif
     db.open();
 
     QSqlQuery init;
@@ -458,13 +489,15 @@ int main(int argc, char *argv[]) {
     QLineEdit *hours =  new QLineEdit;
     hours->setText("24");
 
- QSplitter *splitter = new QSplitter;
+    QSplitter *splitter = new QSplitter;
     QSplitter *splitter2 = new QSplitter;
     QSplitter *timesplit = new QSplitter;
-       QSplitter *timesplit2 = new QSplitter;
+    QSplitter *timesplit2 = new QSplitter;
     QLabel *tokenslbl = new QLabel;
-     QLabel *hourslbl = new QLabel;
-     hourslbl->setText("Valid For (hours)");
+    QLabel *hourslbl = new QLabel;
+    hourslbl->setText("Valid For (hours)");
+
+
     tokensleftlbl = new QLabel;
     tokenslbl->setText("tokens");
     tokengen->setText("10000");
@@ -475,6 +508,8 @@ int main(int argc, char *argv[]) {
 
     auto *exportBtn = new QPushButton("Export Tokens to File");
     auto *importBtn = new QPushButton("Import & Redeem Token File");
+
+
 
     timesplit->addWidget(hourslbl);
      timesplit->addWidget(hours);
