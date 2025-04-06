@@ -153,9 +153,6 @@ QString generateTokenFile(QString count2, int hoursToExpire) {
     QByteArray md5 = QCryptographicHash::hash(rawData.toUtf8(), QCryptographicHash::Md5).toHex();
     lines << "MD5: " + QString(md5);
 
-    tokensleft();
-    tokenstxt->setText("");
-
     // Create file name based on timestamp for backup and export
     QString filePath = QFileDialog::getSaveFileName(nullptr, "Export Token File", "", "Token File (*.iou)");
     if (!filePath.isEmpty()) {
@@ -177,6 +174,9 @@ QString generateTokenFile(QString count2, int hoursToExpire) {
             insertFile.bindValue(":md5_checksum", QString(md5));
             insertFile.bindValue(":expiry_time", expiry);
             insertFile.exec();
+
+            tokensleft();
+            tokenstxt->setText("");
 
             return QString("Exported %1 tokens to %2").arg(tokens.size()).arg(filePath);
         }
@@ -260,6 +260,17 @@ void bruteForceTokenPool(int total = 100000, int batchSize = 1000) {
     QSqlDatabase::database().commit();
 }
 
+void removeTransactionFileByMD5(const QString &md5) {
+    QSqlQuery query;
+    query.prepare("DELETE FROM transaction_files WHERE md5 = :md5");
+    query.bindValue(":md5", md5);
+    if (!query.exec()) {
+        qDebug() << "Failed to remove transaction file entry:" << query.lastError().text();
+    } else {
+        qDebug() << "Removed transaction file entry for MD5:" << md5;
+    }
+}
+
 QString importTokenFile() {
     QString filePath = QFileDialog::getOpenFileName(nullptr, "Import Token File", "", "Token File (*.iou)");
     if (filePath.isEmpty()) return "Import cancelled.";
@@ -305,6 +316,8 @@ QString importTokenFile() {
     // Check for backup files (expired ones), restore if needed
     QSqlQuery queryBackup;
   //  queryBackup.prepare("SELECT backup_path, md5_checksum, expiry_time FROM transaction_files WHERE expiry_time < :current_time");
+
+    // remove entry after processing - todo
         queryBackup.prepare("SELECT backup_path, md5_checksum, expiry_time FROM transaction_files");
     queryBackup.bindValue(":current_time", QDateTime::currentDateTime().toString(Qt::ISODate));
 
@@ -395,6 +408,7 @@ QString importTokenFile() {
                     }
 
                     backupFile.close();
+                    removeTransactionFileByMD5(originalMD5);
                 } else {
                   //  qDebug() << "MD5 checksum mismatch for backup file: " << backupPath;
                 }
@@ -435,17 +449,29 @@ int main(int argc, char *argv[]) {
     tokenstxt =  new QLineEdit;
     QLineEdit *tokengen =  new QLineEdit;
     //   QLineEdit *tokenstxt =  new QLineEdit;
+    QLineEdit *hours =  new QLineEdit;
+    hours->setText("24");
 
  QSplitter *splitter = new QSplitter;
     QSplitter *splitter2 = new QSplitter;
+    QSplitter *timesplit = new QSplitter;
+       QSplitter *timesplit2 = new QSplitter;
     QLabel *tokenslbl = new QLabel;
+     QLabel *hourslbl = new QLabel;
+     hourslbl->setText("Valid For (hours)");
     tokensleftlbl = new QLabel;
     tokenslbl->setText("tokens");
-    tokengen->setText("1000");
+    tokengen->setText("10000");
+
+    QLabel *ee = new QLabel;
+    ee->setText("Remaining");
+
 
     auto *exportBtn = new QPushButton("Export Tokens to File");
     auto *importBtn = new QPushButton("Import & Redeem Token File");
 
+    timesplit->addWidget(hourslbl);
+     timesplit->addWidget(hours);
     layout->addWidget(tokenInput);
     layout->addWidget(redeemBtn);
     splitter->addWidget(tokengen);
@@ -454,7 +480,10 @@ int main(int argc, char *argv[]) {
     layout->addWidget(splitter);
     splitter2->addWidget(tokenslbl);
     splitter2->addWidget(tokenstxt);
+    splitter2->addWidget(ee);
         splitter2->addWidget(tokensleftlbl);
+             layout->addWidget(timesplit);
+        //     layout->addWidget(timesplit2);
       layout->addWidget(splitter2);
     layout->addWidget(exportBtn);
     layout->addWidget(importBtn);
@@ -469,6 +498,9 @@ int main(int argc, char *argv[]) {
    QObject::connect(&mytimer,&QTimer::timeout,tokensleft);
    mytimer.start(5000);
 
+      QTimer mytimer2;
+   QObject::connect(&mytimer2,&QTimer::timeout,restoreExpiredTokensFromBackup);
+   mytimer.start(500000);
 
     QObject::connect(redeemBtn, &QPushButton::clicked, [&]() {
         QString result = validateTokenRedemption(tokenInput->text().trimmed());
@@ -483,7 +515,7 @@ int main(int argc, char *argv[]) {
         output->appendPlainText("Selected valid tokens.");
     });
     QObject::connect(exportBtn, &QPushButton::clicked, [&]() {
-        output->appendPlainText(generateTokenFile(tokenstxt->text(),24));
+        output->appendPlainText(generateTokenFile(tokenstxt->text(),hours->text().toInt()));
     });
     QObject::connect(importBtn, &QPushButton::clicked, [&]() {
         output->appendPlainText(importTokenFile());
