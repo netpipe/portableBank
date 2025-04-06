@@ -19,6 +19,28 @@
 #include <QSplitter>
 
 QLabel *tokensleftlbl;
+QLineEdit *tokenstxt;
+
+int getTokensLeft() {
+    QSqlQuery query;
+    query.prepare("SELECT COUNT(*) FROM valid_tokens WHERE redeemed = 0");
+
+    if (!query.exec()) {
+        qDebug() << "Failed to execute query:" << query.lastError().text();
+        return -1; // Return -1 to indicate an error
+    }
+
+    if (query.next()) {
+        return query.value(0).toInt(); // Return the number of remaining tokens
+    }
+
+    return 0; // In case no tokens are left
+}
+
+void tokensleft()
+{
+    tokensleftlbl->setText(QString::number(getTokensLeft()) );
+}
 
 QString generateRandomToken(int length = 12) {
     const QString chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -56,6 +78,8 @@ void selectValidTokens(int count) {
     insert.prepare("INSERT INTO valid_tokens (token) SELECT token FROM all_tokens ORDER BY RANDOM() LIMIT :count");
     insert.bindValue(":count", count);
     insert.exec();
+
+    tokensleft();
 }
 
 QString validateTokenRedemption(const QString &token) {
@@ -87,17 +111,32 @@ QString validateTokenRedemption(const QString &token) {
 QString generateTokenFile(QString count2, int hoursToExpire) {
 
    int count = count2.toInt();
+   int counted=0;
 
     if (count != 0 && count2 != "") {
     QSqlQuery query;
-    query.prepare("SELECT token FROM valid_tokens WHERE redeemed = 0 LIMIT :count");
+    query.prepare("SELECT token FROM valid_tokens WHERE redeemed = 0 LIMIT :count"); //random ?
     query.bindValue(":count", count);
     query.exec();
 
     QStringList tokens;
     while (query.next()) {
         tokens << query.value(0).toString();
+        counted = counted + 1;
     }
+
+    // check if enough count
+    qDebug() << counted << count << endl;
+    if ( counted == count ) {
+    // Mark selected tokens as redeemed immediately
+    QSqlQuery update;
+    update.prepare("UPDATE valid_tokens SET redeemed = 1 WHERE token = :token");
+
+    for (const QString &token : tokens) {
+        update.bindValue(":token", token);
+        update.exec();
+    }
+
 
     QString timestamp = QDateTime::currentDateTime().toString(Qt::ISODate);
     QString expiry = QDateTime::currentDateTime().addSecs(hoursToExpire * 3600).toString(Qt::ISODate);
@@ -112,6 +151,9 @@ QString generateTokenFile(QString count2, int hoursToExpire) {
     QString rawData = lines.join("\n");
     QByteArray md5 = QCryptographicHash::hash(rawData.toUtf8(), QCryptographicHash::Md5).toHex();
     lines << "MD5: " + QString(md5);
+
+    tokensleft();
+    tokenstxt->setText("");
 
     // Create file name based on timestamp for backup and export
     QString filePath = QFileDialog::getSaveFileName(nullptr, "Export Token File", "", "Token File (*.iou)");
@@ -137,6 +179,7 @@ QString generateTokenFile(QString count2, int hoursToExpire) {
 
             return QString("Exported %1 tokens to %2").arg(tokens.size()).arg(filePath);
         }
+    }
     }
     }
     return "Export cancelled or failed.";
@@ -234,6 +277,7 @@ QString importTokenFile() {
     QString rawData = lines.mid(0, md5Index).join("\n");
     QByteArray calculatedMD5 = QCryptographicHash::hash(rawData.toUtf8(), QCryptographicHash::Md5).toHex();
     if (originalMD5 != calculatedMD5) return "MD5 mismatch: File integrity compromised.";
+    qDebug() << "md5 sum" << calculatedMD5;
 
     // Check expiry
     QString expiryLine = lines.filter(QRegExp("^Expires:")).value(0);
@@ -259,7 +303,8 @@ QString importTokenFile() {
 
     // Check for backup files (expired ones), restore if needed
     QSqlQuery queryBackup;
-    queryBackup.prepare("SELECT backup_path, md5_checksum, expiry_time FROM transaction_files WHERE expiry_time < :current_time");
+  //  queryBackup.prepare("SELECT backup_path, md5_checksum, expiry_time FROM transaction_files WHERE expiry_time < :current_time");
+        queryBackup.prepare("SELECT backup_path, md5_checksum, expiry_time FROM transaction_files");
     queryBackup.bindValue(":current_time", QDateTime::currentDateTime().toString(Qt::ISODate));
 
     if (!queryBackup.exec()) {
@@ -271,62 +316,82 @@ QString importTokenFile() {
         QString backupPath = queryBackup.value(0).toString();
         QString storedMD5 = queryBackup.value(1).toString();
         QDateTime expiry = QDateTime::fromString(queryBackup.value(2).toString(), Qt::ISODate);
-
-        if (expiry < QDateTime::currentDateTime()) {
+ //qDebug() << "backup exists";
+       // if (expiry < QDateTime::currentDateTime()) {
             QFile backupFile(backupPath);
+
             if (backupFile.exists() && backupFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+             //    if (backupFile.exists() ) {
+// qDebug() << "backup exists2";
                 QByteArray backupData = backupFile.readAll();
-                QByteArray calculatedMD5 = QCryptographicHash::hash(backupData, QCryptographicHash::Md5).toHex();
+              //  QByteArray calculatedMD5 = QCryptographicHash::hash(backupData, QCryptographicHash::Md5).toHex();
+
+                QString backupText = QString::fromUtf8(backupData);
+                QStringList lines2 = backupText.split('\n');
+
+
+                int md5Index = lines2.lastIndexOf(QRegExp("^MD5: .*"));
+                if (md5Index == -1) return "Invalid file format: No MD5 found.";
+
+                // Only join lines up to (but not including) the MD5 line
+                QString rawData = lines2.mid(0, md5Index).join("\n");
+
+
+                QByteArray calculatedMD52 = QCryptographicHash::hash(rawData.toUtf8(), QCryptographicHash::Md5).toHex();
+
 
                 // Validate MD5 checksum
-                if (storedMD5 == QString(calculatedMD5)) {
-                    QTextStream in(&backupFile);
-                    QStringList backupLines;
-                    while (!in.atEnd()) {
-                        backupLines << in.readLine().trimmed();
+                if (originalMD5 == QString(calculatedMD52)) { //todo
+             //  if (storedMD5 == QString(originalMD5)) {
+               ///     qDebug() << "matches " << backupPath;
+                    qDebug() << "testing " << QString(calculatedMD52) ;
+                   // QTextStream in(&backupFile);
+                   // QStringList backupLines;
+                   // while (!in.atEnd()) {
+                   //     backupLines << in.readLine().trimmed();
+                   // }
+
+                    int md5Index = -1;
+                    int tokensStart = -1;
+
+                    for (int i = 0; i < lines2.size(); ++i) {
+                        QString line = lines2[i].trimmed();
+                        if (line.startsWith("Tokens:")) {
+                            tokensStart = i + 1;
+                        } else if (line.startsWith("MD5:")) {
+                            md5Index = i;
+                            break;
+                        }
                     }
 
-                    int backupTokenStart = backupLines.indexOf("Tokens:") + 1;
-                    int backupTokenEnd = backupLines.indexOf("MD5:") - 1;
-                    QStringList backupTokens = backupLines.mid(backupTokenStart, backupTokenEnd - backupTokenStart);
+                  //  if (tokensStart == -1 || md5Index == -1 || tokensStart >= md5Index) {
+                 //       qDebug() << "Invalid file: couldn't detect token block.";
+                   // } else {
+                        QStringList backupTokens = lines2.mid(tokensStart, md5Index - tokensStart);
+                  //      qDebug() << "Parsed tokens:" << backupTokens;
+                  //      qDebug() << "Token count:" << backupTokens.count();
+                  //  }
 
+                  //  qDebug() << backupTokens[1].toLatin1();
+ //qDebug() << backupTokens.count() ;
                     // Restore tokens from the backup file
                     for (const QString &token : backupTokens) {
                         QSqlQuery restoreQuery;
                         restoreQuery.prepare("UPDATE valid_tokens SET redeemed = 0 WHERE token = :token");
                         restoreQuery.bindValue(":token", token);
                         restoreQuery.exec();
+                     //   qDebug() << token ;
                     }
+
                     backupFile.close();
                 } else {
-                    qDebug() << "MD5 checksum mismatch for backup file: " << backupPath;
+                  //  qDebug() << "MD5 checksum mismatch for backup file: " << backupPath;
                 }
-            }
+         //   }
         }
     }
 
     return QString("Imported %1 tokens. %2 were valid and redeemed.").arg(importedTokens.size()).arg(redeemed);
-}
-
-int getTokensLeft() {
-    QSqlQuery query;
-    query.prepare("SELECT COUNT(*) FROM valid_tokens WHERE redeemed = 0");
-
-    if (!query.exec()) {
-        qDebug() << "Failed to execute query:" << query.lastError().text();
-        return -1; // Return -1 to indicate an error
-    }
-
-    if (query.next()) {
-        return query.value(0).toInt(); // Return the number of remaining tokens
-    }
-
-    return 0; // In case no tokens are left
-}
-
-void tokensleft()
-{
-    tokensleftlbl->setText(QString::number(getTokensLeft()) );
 }
 
 int main(int argc, char *argv[]) {
@@ -356,7 +421,7 @@ int main(int argc, char *argv[]) {
     auto *genAllBtn = new QPushButton("Generate All Tokens");
     auto *genValidBtn = new QPushButton("Select Valid Tokens");
 
-    QLineEdit *tokenstxt =  new QLineEdit;
+    tokenstxt =  new QLineEdit;
     QLineEdit *tokengen =  new QLineEdit;
     //   QLineEdit *tokenstxt =  new QLineEdit;
 
@@ -365,7 +430,7 @@ int main(int argc, char *argv[]) {
     QLabel *tokenslbl = new QLabel;
     tokensleftlbl = new QLabel;
     tokenslbl->setText("tokens");
-    tokengen->setText("10000");
+    tokengen->setText("1000");
 
     auto *exportBtn = new QPushButton("Export Tokens to File");
     auto *importBtn = new QPushButton("Import & Redeem Token File");
@@ -384,7 +449,7 @@ int main(int argc, char *argv[]) {
     layout->addWidget(importBtn);
     layout->addWidget(output);
 
-   QTimer::singleShot(10000, &tokensleft);
+   QTimer::singleShot(50, &tokensleft);
 
 
    // QTimer::singleShot(1000, this, SLOT( standaloneFunc(tokenslbl)));
