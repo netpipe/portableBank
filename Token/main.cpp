@@ -136,13 +136,7 @@ QString generateTokenFile(QString count2, int hoursToExpire) {
     qDebug() << counted << count << endl;
     if ( counted == count ) {
     // Mark selected tokens as redeemed immediately
-    QSqlQuery update;
-    update.prepare("UPDATE valid_tokens SET redeemed = 1 WHERE token = :token");
 
-    for (const QString &token : tokens) {
-        update.bindValue(":token", token);
-        update.exec();
-    }
 
 
     QString timestamp = QDateTime::currentDateTime().toString(Qt::ISODate);
@@ -153,6 +147,8 @@ QString generateTokenFile(QString count2, int hoursToExpire) {
     lines << "Timestamp: " + timestamp;
     lines << "Expires: " + expiry;
     lines << "Tokens:";
+    //regional tokens for verification purposes
+
     for (const QString &t : tokens) lines << t;
 
     QString rawData = lines.join("\n");
@@ -161,11 +157,19 @@ QString generateTokenFile(QString count2, int hoursToExpire) {
 
     // Create file name based on timestamp for backup and export
     #ifdef __APPLE__
-    QString filePath = QFileDialog::getSaveFileName(nullptr, "Export Token File", "/Applications/EBANKER.app/Contents/MacOS/files", "Token File (*.iou)");
+    QString filePath = QFileDialog::getSaveFileName(nullptr, "Export Token File", "/Applications/EBANKER.app/Contents/MacOS/files/", "Token File (*.iou)");
      #else
     QString filePath = QFileDialog::getSaveFileName(nullptr, "Export Token File", "", "Token File (*.iou)");
     #endif
     if (!filePath.isEmpty()) {
+        QSqlQuery update;
+        update.prepare("UPDATE valid_tokens SET redeemed = 1 WHERE token = :token");
+
+        for (const QString &token : tokens) {
+            update.bindValue(":token", token);
+            update.exec();
+        }
+
         QFile file(filePath);
         if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
             QTextStream out(&file);
@@ -254,6 +258,7 @@ void restoreExpiredTokensFromBackup() {
                     }
                     qDebug() << "restored tokens";
                     backupFile.close();
+                    backupFile.remove();
                // } else {
                 //    qDebug() << "MD5 checksum mismatch for backup file: " << backupPath;
                 //}
