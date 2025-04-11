@@ -111,6 +111,7 @@ public:
         if (reply == QMessageBox::Yes) {
             timer->start(30000);
             intrestbuttont=false;
+            applyDailyInterest();
         }
 
         output = new QTextEdit(this);
