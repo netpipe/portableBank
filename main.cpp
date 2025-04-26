@@ -119,10 +119,10 @@ public:
         layout->addWidget(output);
 
         db = QSqlDatabase::addDatabase("QSQLITE");
-#ifdef __APPLE__
+#ifdef __A //PPLE__
                 db.setDatabaseName("/Applications/portableBank.app/Contents/MacOS/bank.db");
 #else
-        db.setDatabaseName("bank.db");
+        db.setDatabaseName(QCoreApplication::applicationDirPath() +"/bank.db");
 #endif
         if (!db.open()) {
             qDebug() << "Error: Connection failed!";
